@@ -1,7 +1,10 @@
-from keras.layers import Conv2D, ELU, BatchNormalization, concatenate, add, LeakyReLU
+from keras.layers import Conv2D, ELU, BatchNormalization, concatenate, add, LeakyReLU, Input, MaxPooling2D, Flatten
 import numpy as np
+from keras.layers import Dense, Dropout
+from keras.models import Model
+from keras import optimizers
 import keras.backend as K
-
+import preprocess
 
 #act = LeakyReLU()
 act = 'sigmoid'
@@ -22,17 +25,40 @@ def res_block(x, filter, unit_count):
     #x = ELU()(x)
     return x
 
-def __denseUnit(inputs, filters):
+def create_dense_model(batch_size):
+    act = 'sigmoid'
+    inp = Input((preprocess.default_height, preprocess.default_width, 1))
+    x, filters = dense_block(inp, input_filters=1, conv_filters=4, unit_count=2, activation=act)
+    x = MaxPooling2D()(x)
+    x, filters = dense_block(x, input_filters=filters, conv_filters=2, unit_count=2, activation=act)
+    x = MaxPooling2D()(x)
+    x, filters = dense_block(x, input_filters=filters, conv_filters=2, unit_count=2, activation=act)
+    x = MaxPooling2D()(x)
+    x = Flatten()(x)
+    x = Dense(units=512, activation=act)(x)
+    x = Dropout(0.25)(x)
+    x = Dense(128, activation=act)(x)
+    x = Dense(4, activation=act)(x)
+    model = Model(inp, x)
+    optimizer = optimizers.SGD(lr=0.05, momentum=0.01)
+
+    model.compile(optimizer=optimizer, loss=create_loss(batch_size))
+    print(model.summary())
+    return model
+
+
+def __denseUnit(inputs, filters, activation):
     x = BatchNormalization()(inputs)
-    x = Conv2D(filters, kernel_size=(1, 3), padding='same')(x)
-    x = Conv2D(filters, kernel_size=(3, 1), padding='same')(x)
-    x = ELU()(x)
+    #x = Conv2D(filters, kernel_size=(1, 3), padding='same')(x)
+    #x = Conv2D(filters, kernel_size=(3, 1), padding='same', activation=activation)(x)
+    x = Conv2D(filters, kernel_size=3, padding='same', activation=activation)(x)
+
     return x
 
-def dense_block(inputs, input_filters, unit_count, conv_filters):
+def dense_block(inputs, input_filters, unit_count, conv_filters, activation):
     concat_inputs = inputs
     for i in range(unit_count):
-        x = __denseUnit(concat_inputs, conv_filters)
+        x = __denseUnit(concat_inputs, input_filters, activation=activation)
         concat_inputs = concatenate([concat_inputs, x], axis=-1)
         input_filters += conv_filters
 
