@@ -3,13 +3,17 @@ from keras.models import Model, Sequential
 from keras.callbacks import  EarlyStopping, ReduceLROnPlateau
 import matplotlib.pyplot as plt
 from keras import optimizers
+from keras.models import load_model
+
+test_name = 'dense_model_05_075'
+batch_size = 20
+epochs = 350
 
 import preprocess
 import layers
 
 
-batch_size = 8
-epochs = 100
+
 
 
 
@@ -20,11 +24,11 @@ class HandDetectionNetwork:
         self.model = layers.create_dense_model(batch_size)
 
 
-    def fit(self, path=r'D:/Database/train1.csv'):
+    def fit(self,epo, path=r'D:/Database/train1.csv'):
         X, Y = preprocess.getFitData(path)
-        es = EarlyStopping(patience=epochs, restore_best_weights=True)
+        es = EarlyStopping(patience=epochs/ 2, restore_best_weights=True)
         #re = ReduceLROnPlateau(factor=0.5, patience=10, min_lr=0.001)
-        history = self.model.fit(X, Y, batch_size=batch_size, epochs=epochs,
+        history = self.model.fit(X, Y, batch_size=batch_size, epochs=epo,
                        validation_split=0.05, verbose=2, callbacks=[es])
 
         fig, ax = plt.subplots(2, 1)
@@ -55,20 +59,31 @@ class HandDetectionNetwork:
         results = preprocess.restoreLabelData(results)
         print('restored results: ', results[0])
         for x in range(len(names)):
-            preprocess.show_image_with_rectangle(names[x], results[x])
-
-
+            preprocess.show_image_with_rectangle(names[x], results[x], x, test_name)
 
 
 
 net = HandDetectionNetwork()
-createNewModel = True
-if createNewModel:
-    net.fit()
-    net.model.save_weights('dense_model.h5')
-else:
-    net.model.load_weights('dense_model.h5')
 
+def load_my_model(name, iteration):
+    #name + str(iteration)
+    net.model = load_model('saved_data/' + name + str(iteration) + ' model ' + '.h5',
+                           custom_objects={'loss_v2': layers.create_loss(0.5, 0.75)})
+    net.model.load_weights('saved_data/' + name + str(iteration) + '.h5')
+
+createNewModel = False
+if createNewModel:
+    net.fit(epochs)
+    net.model.save_weights('saved_data/' + test_name + '.h5')
+    net.model.save('saved_data/' + test_name + ' model ' + '.h5')
+else:
+    load_my_model(test_name, 2)
+    for i in range(3, 10):
+        print("Started ", i, 'iteration')
+        net.fit(100)
+        net.model.save_weights('saved_data/' + test_name + str(i) + '.h5')
+        net.model.save('saved_data/' + test_name + str(i) + ' model ' + '.h5')
+        print("Finished", i, 'iteration')
 net.show()
 #test_names = preprocess.readTestFiles()
 #net.predict(test_names)

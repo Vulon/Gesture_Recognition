@@ -5,6 +5,8 @@ import os
 
 default_width = 176
 default_height = 144
+default_channels = 3
+
 
 def readTrainFile(path):
     frame = pd.read_csv(path, header=0)
@@ -17,12 +19,12 @@ def prepareImageData(fileList):
     a = []
     for x in range(len(l)):
         image = cv2.imread(l[x])
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        #image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         image = cv2.resize(image,(default_width, default_height),interpolation=cv2.INTER_AREA)
-        image = np.reshape(a=image, newshape=(default_height, default_width, 1))
+        image = np.reshape(a=image, newshape=(default_height, default_width, default_channels))
         a.append(image)
     a = np.asarray(a)
-    a.reshape((-1, default_height, default_width, 1))
+    a.reshape((-1, default_height, default_width, default_channels))
     a = a.astype('float64')
     a = a / 255.0
     return a
@@ -81,12 +83,13 @@ def drawRectangle(image, x1, y1, x2, y2):
     y2 = min(y2, default_height)
     cv2.rectangle(image, (x1, y1), (x2, y2),(0, 0, 255), 1)
 
-def show_image_with_rectangle(path, label):
+def show_image_with_rectangle(path, label, i, test_name):
     image = cv2.imread(path)
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    #image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     image = cv2.resize(image, (default_width, default_height), interpolation=cv2.INTER_AREA)
     drawRectangle(image, label[0], label[1], label[2], label[3])
     print(label)
     cv2.imshow('image', image)
+    cv2.imwrite('saved_data/images/' + test_name + '_' + str(i) + '.png', image)
     cv2.waitKey(0)
     cv2.destroyAllWindows()

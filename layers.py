@@ -4,10 +4,15 @@ from keras.layers import Dense, Dropout
 from keras.models import Model
 from keras import optimizers
 import keras.backend as K
-import preprocess
+
+
+
+act = 'sigmoid'
+
+from preprocess import default_height, default_width, default_channels
 
 #act = LeakyReLU()
-act = 'sigmoid'
+
 
 
 def __resUnit(inputs, filters):
@@ -27,13 +32,11 @@ def res_block(x, filter, unit_count):
 
 def create_dense_model(batch_size):
     act = 'sigmoid'
-    inp = Input((preprocess.default_height, preprocess.default_width, 1))
-    x, filters = dense_block(inp, input_filters=1, conv_filters=4, unit_count=2, activation=act)
-    x = MaxPooling2D()(x)
-    x, filters = dense_block(x, input_filters=filters, conv_filters=2, unit_count=2, activation=act)
-    x = MaxPooling2D()(x)
-    x, filters = dense_block(x, input_filters=filters, conv_filters=2, unit_count=2, activation=act)
-    x = MaxPooling2D()(x)
+    inp = Input((default_height, default_width, default_channels))
+    x = dense_block(inp, conv_filters=8, unit_count=3, activation=act)
+    x = dense_block(x, conv_filters=6, unit_count=3, activation=act)
+    x = dense_block(x, conv_filters=4, unit_count=3, activation=act)
+    x = dense_block(x, conv_filters=4, unit_count=3, activation=act)
     x = Flatten()(x)
     x = Dense(units=512, activation=act)(x)
     x = Dropout(0.25)(x)
@@ -42,7 +45,7 @@ def create_dense_model(batch_size):
     model = Model(inp, x)
     optimizer = optimizers.SGD(lr=0.05, momentum=0.01)
 
-    model.compile(optimizer=optimizer, loss=create_loss(batch_size))
+    model.compile(optimizer=optimizer, loss=create_loss(error_alpha=0.5, size_alpha=0.75))
     print(model.summary())
     return model
 
@@ -55,16 +58,16 @@ def __denseUnit(inputs, filters, activation):
 
     return x
 
-def dense_block(inputs, input_filters, unit_count, conv_filters, activation):
+def dense_block(inputs, unit_count, conv_filters, activation):
     concat_inputs = inputs
     for i in range(unit_count):
-        x = __denseUnit(concat_inputs, input_filters, activation=activation)
+        x = __denseUnit(concat_inputs, conv_filters, activation=activation)
         concat_inputs = concatenate([concat_inputs, x], axis=-1)
-        input_filters += conv_filters
+    concat_inputs = MaxPooling2D()(concat_inputs)
 
-    return concat_inputs, input_filters
+    return concat_inputs
 
-def create_loss(batch_size):
+def create_loss(error_alpha, size_alpha):
 
     def loss_v2(y_true, y_pred):
         maximum = K.maximum(y_true, y_pred)
@@ -77,7 +80,8 @@ def create_loss(batch_size):
         error1 = K.abs((y_pred[:, 2] - y_pred[:, 0]) - K.abs(y_pred[:, 2] - y_pred[:, 0]))
         error2 = K.abs((y_pred[:, 3] - y_pred[:, 1]) - K.abs(y_pred[:, 3] - y_pred[:, 1]))
 
-        res = 1 - (inter_area / (true_area + pred_area - inter_area)) + error1 + error2
+        res = 1 - (inter_area / (true_area + pred_area - inter_area)) + (error1 + error2) * error_alpha
+        res = res + K.maximum(0.0, (true_area - pred_area) * size_alpha)
         return K.mean(res)
 
     return loss_v2
